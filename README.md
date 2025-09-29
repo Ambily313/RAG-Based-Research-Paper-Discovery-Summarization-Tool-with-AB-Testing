@@ -1,1 +1,1 @@
-# RAG-Based-Research-Paper-Discovery-Summarization-Tool-with-A-B-Testing
+# RAG-Based-Research-Paper-Discovery-Summarization-Tool-with-A/B-Testing
