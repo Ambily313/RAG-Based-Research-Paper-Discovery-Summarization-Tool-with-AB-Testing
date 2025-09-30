@@ -1,0 +1,30 @@
+
+EXPERIMENTAL RESULTS
+============================================================
+
+Sample Size: 25 papers
+
+ROUGE Scores (Average):
+  Model A (BART):
+    - ROUGE-1: 0.5287
+    - ROUGE-2: 0.5111
+    - ROUGE-L: 0.5216
+  
+  Model B (DistilBART):
+    - ROUGE-1: 0.5174
+    - ROUGE-2: 0.4925
+    - ROUGE-L: 0.5123
+
+Statistical Significance:
+  - p-value: 0.5652
+  - Cohen's d: 0.0703
+  - 95% CI: [-0.0287, 0.0513]
+
+Latency Performance:
+  - Model A: 2.28s (±0.40s)
+  - Model B: 1.69s (±0.39s)
+
+RECOMMENDATION:
+============================================================
+✗ No statistically significant difference detected.
+  Consider: longer test period, larger sample size, or user preference data.
