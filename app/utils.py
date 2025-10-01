@@ -225,11 +225,13 @@ def analyze_ab_test_logs(log_file: str = 'ab_test_logs.csv') -> Dict:
     total_votes = len(df)
     model_a_votes = (df['model_chosen'] == 'A').sum()
     model_b_votes = (df['model_chosen'] == 'B').sum()
+    equal_votes = (df['model_chosen'] == 'Equal').sum()
     
     results = {
         'total_votes': total_votes,
         'model_a_votes': model_a_votes,
         'model_b_votes': model_b_votes,
+        'equal_votes': equal_votes,
         'model_a_rate': model_a_votes / total_votes if total_votes > 0 else 0,
         'model_b_rate': model_b_votes / total_votes if total_votes > 0 else 0,
         'status': 'success'
@@ -237,6 +239,8 @@ def analyze_ab_test_logs(log_file: str = 'ab_test_logs.csv') -> Dict:
     
     # Chi-square assumption check: require at least 30 total votes and 5 votes per model
     MIN_VOTES_FOR_STATS = 30 
+    # For chi-square test, we only compare A vs B (excluding "Equal" votes)
+    ab_only_votes = model_a_votes + model_b_votes
 
     if total_votes < MIN_VOTES_FOR_STATS or model_a_votes < 5 or model_b_votes < 5:
         # Insufficient data for reliable Chi-Square test. Return a warning instead of error.
@@ -244,11 +248,13 @@ def analyze_ab_test_logs(log_file: str = 'ab_test_logs.csv') -> Dict:
         results['message'] = f'Insufficient data for statistical analysis (need at least {MIN_VOTES_FOR_STATS} votes and > 5 votes per model).'
         return results
 
-    # Chi-square test (runs only if data is sufficient)
+    # Chi-square test 
     try:
         from scipy.stats import chisquare
         observed = [model_a_votes, model_b_votes]
-        expected = [total_votes/2, total_votes/2]
+       
+        # Expected is 50/50 split of ONLY the A+B votes (not total_votes)
+        expected = [ab_only_votes/2, ab_only_votes/2]
         
         # This test compares preference against a null hypothesis of equal preference (50/50)
         chi2, p_value = chisquare(observed, expected) 

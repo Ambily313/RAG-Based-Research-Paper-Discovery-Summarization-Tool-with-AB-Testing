@@ -1,6 +1,7 @@
 """
 RAG Research Paper Discovery & Summarization Tool
 Interactive Streamlit Application with A/B Testing
+FIXED: Users can only vote once per summary generation session
 """
 
 import streamlit as st
@@ -18,7 +19,7 @@ from utils import (
 )
 import os
 from dotenv import load_dotenv
-import traceback # Added for better error logging (optional but useful)
+import traceback
 
 # Page config
 st.set_page_config(
@@ -32,17 +33,24 @@ st.set_page_config(
 load_dotenv()
 HF_API_KEY = os.getenv('HUGGINGFACE_API_KEY')
 
-# --- Helper Function for Summary Display (Fixes Issue 1 & 3) ---
+# --- Session State Initialization ---
+if 'stats_loaded' not in st.session_state:
+    st.session_state['stats_loaded'] = False
+if 'vote_cast' not in st.session_state:
+    st.session_state['vote_cast'] = False
+# Add a unique session ID to track which summary pair was voted on
+if 'current_summary_id' not in st.session_state:
+    st.session_state['current_summary_id'] = None
+# ------------------------------------
+
+# --- Helper Function for Summary Display ---
 def display_summary(summary_text, gen_time=None):
     """Checks if the summary is an error message and displays it accordingly."""
-    # Check if the text is an error message returned from the utility function
     is_error = summary_text.lower().startswith("error:")
     
     if is_error:
-        # Display API/Network errors in a red box
         st.error(summary_text)
     else:
-        # Display successful summaries with the custom style
         st.markdown(f"<div class='summary-box'>{summary_text}</div>", 
                     unsafe_allow_html=True)
     
@@ -52,8 +60,7 @@ def display_summary(summary_text, gen_time=None):
         st.caption(f"📏 Length: {len(summary_text.split())} words")
 # -----------------------------------------------------------------
 
-
-# Custom CSS with elegant green button
+# Custom CSS
 st.markdown("""
 <style>
     .main-header {
@@ -81,7 +88,6 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    /* Elegant green button styling */
     .stButton > button[kind="primary"] {
         background-color: #10B981 !important;
         color: white !important;
@@ -102,30 +108,24 @@ st.markdown("""
 # SIDEBAR
 # ================================
 
-st.sidebar.image("https://via.placeholder.com/300x100/1f77b4/ffffff?text=RAG+Research+Tool", use_column_width=True)
-
-# Changed from "Select Page" to "Select What You Want to Perform"
 st.sidebar.markdown("### 🎯 Choose An Action to Perform")
 
 page = st.sidebar.radio(
-    "",  # Removed label since it's now in markdown above
+    "",
     ["🔍 Search & Summarize", "🧪 A/B Testing", "📊 Analytics", "ℹ️ About"],
     label_visibility="collapsed"
 )
 
 st.sidebar.markdown("---")
 
-# Search parameters
-with st.sidebar.expander("🔧 Search Parameters"):
+with st.sidebar.expander("Set Your Search Parameters Here"):
     top_k = st.slider("Number of papers to retrieve", 1, 10, 5)
     summary_length = st.slider("Summary max length (words)", 100, 350, 250)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📈 Quick Stats")
 
-# Load and display dataset stats
 try:
-    # Ensure this runs only once when the app starts
     if 'stats' not in st.session_state:
         st.session_state['stats'] = get_dataset_stats()
         
@@ -147,7 +147,6 @@ if page == "🔍 Search & Summarize":
     or topic below to find relevant papers and generate AI-powered summaries.
     """)
     
-    # Search interface
     col1, col2 = st.columns([4, 1])
     with col1:
         query = st.text_input(
@@ -157,11 +156,9 @@ if page == "🔍 Search & Summarize":
     with col2:
         search_button = st.button("🔍 Search", type="primary", use_container_width=True)
     
-    # Use session state to preserve search results across re-runs
     if search_button and query:
         with st.spinner("🔎 Searching papers..."):
             try:
-                # Retrieve papers
                 papers = retrieve_papers(query, top_k=top_k)
                 st.session_state['search_papers'] = papers
                 st.session_state['search_query'] = query
@@ -170,13 +167,11 @@ if page == "🔍 Search & Summarize":
             
             except Exception as e:
                 st.error(f"Error during search: {str(e)}")
-                st.info("Make sure all data files (faiss_index.bin, arxiv_papers_clean.csv) are in the `../data/` directory")
+                st.info("Make sure all data files are in the `../data/` directory")
     
-    # Display results if they exist in session state
     if 'search_papers' in st.session_state:
         papers = st.session_state['search_papers']
         
-        # Display results
         for idx, row in papers.iterrows():
             with st.container():
                 st.markdown(f"### {row['rank']}. {row['title']}")
@@ -194,13 +189,10 @@ if page == "🔍 Search & Summarize":
                     if pdf_url and st.button(f"📄 View PDF", key=f"pdf_{idx}"):
                         st.markdown(f"[Open PDF]({pdf_url})")
                 
-                # Abstract
                 with st.expander("📖 View Abstract"):
                     abstract_text = row.get('abstract_clean', row.get('abstract', 'No abstract available'))
                     st.write(abstract_text)
                 
-                # Generate summary
-                # Use a specific key for the summary button to trigger only this block on click
                 if st.button(f"✨ Generate Summary", key=f"sum_{idx}"):
                     if not HF_API_KEY:
                         st.error("❌ Summarization service is not configured. Please set the HUGGINGFACE_API_KEY environment variable.")
@@ -217,48 +209,27 @@ if page == "🔍 Search & Summarize":
                                 )
                                 
                                 st.markdown("#### 📝 AI-Generated Summary")
-                                # Use the helper function to handle success/error display
                                 display_summary(summary, gen_time)
                             
                             except Exception as e:
-                                # Catch any unexpected exceptions during the summarization process
-                                st.error(f"An unexpected error occurred during summarization. Check console for details. Error: {str(e)}")
-                                # Optional: print full traceback to the console for debugging
-                                # print(traceback.format_exc())
+                                st.error(f"An unexpected error occurred during summarization: {str(e)}")
                 
                 st.markdown("---")
 
-    
-    # Example queries
-    with st.expander("💡 Example Queries"):
-        examples = [
-            "deep learning for computer vision",
-            "natural language processing transformers",
-            "reinforcement learning robotics",
-            "graph neural networks",
-            "few-shot learning",
-            "attention mechanisms"
-        ]
-        st.markdown("Try these example queries:")
-        for ex in examples:
-            st.markdown(f"- {ex}")
-
 # ================================
-# PAGE 2: A/B TESTING
+# PAGE 2: A/B TESTING 
 # ================================
 
 elif page == "🧪 A/B Testing":
-    st.markdown("<h1 class='main-header'>🧪 Model A/B Testing</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-header'>🔬 Model Performance Analysis</h1>", unsafe_allow_html=True)
     
     st.markdown("""
     Help us determine which summarization model performs better! 
     Search for papers, compare summaries from two different models, and vote for your preference.
     """)
     
-    # Get model configs (Uses updated names from utils.py, addressing Issue 2)
     models = get_model_configs()
     
-    # Display model info
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"### 🤖 {models['model_a']['display_name']}")
@@ -275,7 +246,6 @@ elif page == "🧪 A/B Testing":
     
     st.markdown("---")
     
-    # Search interface
     query_ab = st.text_input("Search for papers:", placeholder="e.g., neural machine translation")
     
     if st.button("🔍 Search for A/B Test", type="primary"):
@@ -287,10 +257,12 @@ elif page == "🧪 A/B Testing":
                 # Clear summaries when performing a new search
                 if 'summary_a' in st.session_state: del st.session_state['summary_a']
                 if 'summary_b' in st.session_state: del st.session_state['summary_b']
+                # Reset vote status
+                st.session_state['vote_cast'] = False
+                st.session_state['current_summary_id'] = None
         else:
             st.warning("⚠️ Please enter a search query")
     
-    # Display papers for A/B testing
     if 'ab_papers' in st.session_state:
         st.markdown("### 📄 Select a Paper to Compare Summaries")
         
@@ -304,7 +276,6 @@ elif page == "🧪 A/B Testing":
         
         selected_paper = papers_ab.iloc[selected_paper_idx]
         
-        # Display paper info
         with st.expander("📖 Paper Details", expanded=True):
             st.markdown(format_paper_card(selected_paper))
         
@@ -333,17 +304,26 @@ elif page == "🧪 A/B Testing":
                             max_length=summary_length
                         )
                         
+                        # Generate unique ID for this summary pair
+                        import hashlib
+                        import time as time_module
+                        summary_id = hashlib.md5(
+                            f"{abstract_text[:100]}{time_module.time()}".encode()
+                        ).hexdigest()
+                        
                         # Store in session state
                         st.session_state['summary_a'] = summary_a
                         st.session_state['summary_b'] = summary_b
                         st.session_state['time_a'] = time_a
                         st.session_state['time_b'] = time_b
                         st.session_state['current_paper'] = selected_paper
+                        st.session_state['current_summary_id'] = summary_id
+                        st.session_state['vote_cast'] = False  # Reset vote for NEW summaries
                     
                     except Exception as e:
                         st.error(f"An unexpected error occurred during A/B summarization. Error: {str(e)}")
         
-        # Display summaries and voting
+        # Display summaries and voting (FIXED LOGIC)
         if 'summary_a' in st.session_state and 'summary_b' in st.session_state:
             st.markdown("### 📊 Compare Summaries")
             
@@ -351,59 +331,64 @@ elif page == "🧪 A/B Testing":
             
             with col1:
                 st.markdown(f"#### Summary A ({models['model_a']['display_name'].split('(')[-1].replace(')','')})")
-                # Use helper function for robust display (Issue 3 Fix)
                 display_summary(st.session_state['summary_a'], st.session_state['time_a'])
 
             with col2:
                 st.markdown(f"#### Summary B ({models['model_b']['display_name'].split('(')[-1].replace(')','')})")
-                # Use helper function for robust display (Issue 3 Fix)
                 display_summary(st.session_state['summary_b'], st.session_state['time_b'])
             
-            # Voting
+            # Voting section
             st.markdown("### 🗳️ Which summary is better?")
             
-            col_vote1, col_vote2, col_vote3 = st.columns([1, 1, 1])
-            
-            # Ensure voting buttons are only displayed if both summaries are NOT errors
+            # Check if voting is enabled
             is_vote_enabled = (not st.session_state['summary_a'].lower().startswith("error:")) and \
                               (not st.session_state['summary_b'].lower().startswith("error:"))
             
-            if is_vote_enabled:
-                with col_vote1:
-                    if st.button("👍 Summary A is Better", use_container_width=True):
-                        log_ab_test_result(
-                            query=st.session_state['ab_query'],
-                            paper_title=st.session_state['current_paper']['title'],
-                            model_chosen='A',
-                            summary_a=st.session_state['summary_a'],
-                            summary_b=st.session_state['summary_b']
-                        )
-                        st.success("✅ Thank you! Your vote has been recorded.")
-                
-                with col_vote2:
-                    if st.button("👍 Summary B is Better", use_container_width=True):
-                        log_ab_test_result(
-                            query=st.session_state['ab_query'],
-                            paper_title=st.session_state['current_paper']['title'],
-                            model_chosen='B',
-                            summary_a=st.session_state['summary_a'],
-                            summary_b=st.session_state['summary_b']
-                        )
-                        st.success("✅ Thank you! Your vote has been recorded.")
-                
-                with col_vote3:
-                    if st.button("🤷 About Equal", use_container_width=True):
-                        log_ab_test_result(
-                            query=st.session_state['ab_query'],
-                            paper_title=st.session_state['current_paper']['title'],
-                            model_chosen='Equal',
-                            summary_a=st.session_state['summary_a'],
-                            summary_b=st.session_state['summary_b']
-                        )
-                        st.success("✅ Thank you! Your vote has been recorded.")
+            if not is_vote_enabled:
+                st.warning("⚠️ Voting disabled: One or both summaries failed to generate. Please check your API key or try again later.")
             else:
-                 st.warning("Voting disabled: One or both summaries failed to generate. Please check your API key or try again later.")
-
+                # Show vote status
+                if st.session_state.get('vote_cast', False):
+                    st.success("✅ Thank you! Your vote has been recorded for this comparison.")
+                    st.info("💡 Generate new summaries to vote again.")
+                else:
+                    col_vote1, col_vote2, col_vote3 = st.columns([1, 1, 1])
+                    
+                    with col_vote1:
+                        if st.button("👍 Summary A is Better", use_container_width=True, key="vote_a"):
+                            log_ab_test_result(
+                                query=st.session_state['ab_query'],
+                                paper_title=st.session_state['current_paper']['title'],
+                                model_chosen='A',
+                                summary_a=st.session_state['summary_a'],
+                                summary_b=st.session_state['summary_b']
+                            )
+                            st.session_state['vote_cast'] = True
+                            st.experimental_rerun()
+                    
+                    with col_vote2:
+                        if st.button("👍 Summary B is Better", use_container_width=True, key="vote_b"):
+                            log_ab_test_result(
+                                query=st.session_state['ab_query'],
+                                paper_title=st.session_state['current_paper']['title'],
+                                model_chosen='B',
+                                summary_a=st.session_state['summary_a'],
+                                summary_b=st.session_state['summary_b']
+                            )
+                            st.session_state['vote_cast'] = True
+                            st.experimental_rerun()
+                    
+                    with col_vote3:
+                        if st.button("🤷 About Equal", use_container_width=True, key="vote_equal"):
+                            log_ab_test_result(
+                                query=st.session_state['ab_query'],
+                                paper_title=st.session_state['current_paper']['title'],
+                                model_chosen='Equal',
+                                summary_a=st.session_state['summary_a'],
+                                summary_b=st.session_state['summary_b']
+                            )
+                            st.session_state['vote_cast'] = True
+                            st.experimental_rerun()
 
 # ================================
 # PAGE 3: ANALYTICS
@@ -416,7 +401,6 @@ elif page == "📊 Analytics":
     View the results of the A/B testing experiment comparing different summarization models.
     """)
     
-    # Analyze logs
     try:
         results = analyze_ab_test_logs()
         
@@ -426,7 +410,6 @@ elif page == "📊 Analytics":
             **No test data available yet.** Go to the A/B Testing page to start collecting data!
             """)
         else:
-            # Display metrics
             st.markdown("### 📈 Overall Results")
             
             col1, col2, col3 = st.columns(3)
@@ -438,10 +421,8 @@ elif page == "📊 Analytics":
             with col3:
                 st.metric("Model B Preference", f"{results['model_b_rate']*100:.1f}%")
             
-            # Visualizations
             st.markdown("### 📊 Visualizations")
             
-            # Pie chart
             equal_votes = results['total_votes'] - results['model_a_votes'] - results['model_b_votes']
             fig_pie = go.Figure(data=[go.Pie(
                 labels=['Model A', 'Model B', 'Equal'],
@@ -451,7 +432,6 @@ elif page == "📊 Analytics":
             fig_pie.update_layout(title="User Preference Distribution")
             st.plotly_chart(fig_pie, use_container_width=True)
             
-            # Statistical significance
             if 'significant' in results:
                 st.markdown("### 🔬 Statistical Analysis")
                 
@@ -470,7 +450,6 @@ elif page == "📊 Analytics":
             else:
                 st.info(f"ℹ️ {results.get('message', 'Need more votes for statistical analysis')}")
             
-            # Show recent logs
             st.markdown("### 📋 Recent Test Logs")
             
             log_path = os.path.join('..', 'data', 'ab_test_logs.csv')
@@ -510,49 +489,12 @@ elif page == "ℹ️ About":
     - **Frontend**: Streamlit
     - **Data Source**: ArXiv API
     
-    ## 📁 Project Structure
-    
-    ```
-    rag-research-papers/
-    ├── notebooks/            # Jupyter notebooks for analysis
-    │   ├── 01_data_collection.ipynb
-    │   ├── 02_eda_preprocessing.ipynb
-    │   ├── 03_embeddings_faiss.ipynb
-    │   ├── 04_rag_prototype.ipynb
-    │   └── 05_ab_testing_analysis.ipynb
-    ├── app/                # Streamlit application
-    │   ├── rag_app.py
-    │   └── utils.py
-    └── data/               # Datasets and artifacts
-        ├── arxiv_papers.csv
-        ├── embeddings.npy
-        ├── faiss_index.bin
-        └── ab_test_logs.csv
-    ```
-    
-    ## 🎓 Key Learnings
-    
-    This project demonstrates a **data scientist's approach** to building ML applications:
-    
-    1. **Start with exploration** (notebooks) before building the app
-    2. **Validate data quality** through EDA
-    3. **Experiment with models** in isolation
-    4. **Measure performance** with quantitative metrics
-    5. **Deploy iteratively** with user feedback loops
-    
-    ## 📖 How to Use
-    
-    1. **Search & Summarize**: Enter a research query to find relevant papers
-    2. **A/B Testing**: Compare summaries from different models and vote
-    3. **Analytics**: View aggregated results and statistical analysis
-    
     ---
     
-    **Version**: 1.0.4 (A/B & Summarization Fix)
-    **Last Updated**: September 2025
+    **Version**: 1.0.5 (Fixed: Single Vote Per Session)  
+    **Last Updated**: October 2025
     """)
     
-    # Dataset statistics
     try:
         stats = st.session_state['stats']
         
@@ -570,7 +512,6 @@ elif page == "ℹ️ About":
         **Date Range**: {stats['date_range']['earliest']} to {stats['date_range']['latest']}
         """)
         
-        # Top categories
         st.markdown("### 🏷️ Top Categories")
         top_cats = pd.DataFrame.from_dict(
             stats['categories']['top_categories'], 
