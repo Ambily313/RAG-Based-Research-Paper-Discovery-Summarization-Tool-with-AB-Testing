@@ -13,19 +13,17 @@ This project builds a **semantic search and summarization system** for academic 
 - ✅ Model evaluation through A/B testing  
 - ✅ Interactive demo with Streamlit  
 
-
-
 ---
-
 ##  Key Features
 
 - **Semantic Search** → Find papers by meaning using Sentence-BERT embeddings  
-- **FAISS Integration** → Fast similarity search with ~100ms average latency  
+- **FAISS Integration** → Fast similarity search with minimal average latency  
 - **AI Summarization** → Generate concise summaries using HuggingFace LLMs  
-- **A/B Testing** → Compare **BART** vs **DistilBART** models with statistical analysis  
+- **A/B Testing** → Compare **BART** vs **DistilBART** summarization models
+  - Uses user preference logs + statistical analysis (Chi-square, t-tests)
+  - Results help determine the best summarizer for academic papers
 - **Interactive UI** → Streamlit app for live demos and user studies  
 
----
 
 ##  Tech Stack
 
