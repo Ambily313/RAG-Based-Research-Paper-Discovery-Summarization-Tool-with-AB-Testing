@@ -19,6 +19,7 @@ faiss-cpu==1.7.4
 # API & Web Scraping
 requests==2.31.0
 arxiv==1.4.7
+pypdf
 
 # Streamlit for App
 streamlit==1.25.0
