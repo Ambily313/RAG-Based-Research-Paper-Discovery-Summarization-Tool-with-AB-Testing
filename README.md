@@ -82,10 +82,8 @@ rag-research-papers/
 │   └── ab_test_logs.csv                # User preference logs
 │
 ├── docs/                               # Documentation
-│   ├── Technical_Architecture.png      # System architecture diagram
+│   ├── Technical_Architecture.png      # System architecture diagram   
 │   
-│   
-│
 ├── requirements.txt                    # Python dependencies
 ├── .env                                # API keys template
 ├── CHANGELOG.md                        # Project changelog
