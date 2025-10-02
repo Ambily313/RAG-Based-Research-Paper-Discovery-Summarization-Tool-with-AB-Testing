@@ -58,9 +58,7 @@ This project builds a **semantic search and summarization system** for academic 
 ## 📁 Project Structure
 
 ```plaintext
-## 📁 Project Structure
 
-```plaintext
 rag-research-papers/
 │
 ├── notebooks/                          # ML workflow notebooks
