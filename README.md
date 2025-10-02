@@ -58,6 +58,9 @@ This project builds a **semantic search and summarization system** for academic 
 ## 📁 Project Structure
 
 ```plaintext
+## 📁 Project Structure
+
+```plaintext
 rag-research-papers/
 │
 ├── notebooks/                          # ML workflow notebooks
@@ -78,8 +81,12 @@ rag-research-papers/
 │   ├── faiss_index.bin                 # FAISS vector index
 │   └── ab_test_logs.csv                # User preference logs
 │
+├── docs/                               # Documentation
+│   ├── Technical_Architecture.png      # System architecture diagram
+│   
+│   
+│
 ├── requirements.txt                    # Python dependencies
-├── .env.example                        # API keys template
+├── .env                                # API keys template
+├── CHANGELOG.md                        # Project changelog
 └── README.md                           # Project documentation
-
-
