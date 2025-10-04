@@ -15,7 +15,7 @@
 
 ---
 
-## 🚀 Version 2.1 Enhancements (2025-10-04)
+## Version 2.1 Enhancements (2025-10-04)
 
 ###  1. Enhanced Search Capabilities
 **Old:**  
